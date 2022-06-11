@@ -1,0 +1,5 @@
+1) using moder gl through GLEW
+2) vertex buffers
+3) vertex attributes and layout
+4) writing shaders
+5) Index buffer "we want to draw a square"

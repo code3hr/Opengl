@@ -1,8 +1,64 @@
+
+// This is a personal academic project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 #include<iostream>
 #include<stdlib.h>
 #include<glew.h>
-#include <GLFW/glfw3.h>
+#include<GLFW/glfw3.h>
 #include<memory>
+#include<fstream>
+#include<string>
+#include<sstream>
+
+
+static void GLClearError()
+{
+    while (glGetError() != GL_NO_ERROR);
+}
+
+static void GLCheckError() {
+    while (GLenum error = glGetError())
+    {
+        std::cout << "[OpenGL Error] (" << error << ")" << std::endl;
+    }
+}
+struct ShaderProgramSource
+{
+    std::string VertexSource;
+    std::string FragmentSource;
+};
+
+static ShaderProgramSource ParseShader(const std::string& filepath)
+{
+    std::ifstream stream(filepath);
+
+    enum class ShaderType
+    {
+        NONE = -1, VERTEX = 0, FRAGMENT = 1
+};
+
+    std::string line;
+    std::stringstream ss[2];
+    ShaderType type = ShaderType::NONE;
+    while (getline(stream, line))
+    {
+        if (line.find("#shader") != std::string::npos)
+        {
+            if (line.find("vertex") != std::string::npos)
+                type = ShaderType::VERTEX;
+            else if (line.find("fragment") != std::string::npos)
+                type = ShaderType::FRAGMENT;
+        }
+
+        else
+        {
+            ss[(int)type] << line << "\n";
+        }
+    }
+    return { ss[0].str(),ss[1].str() };
+}
+
 static unsigned int CompileShader(unsigned int type, const std::string& source)
 {
  unsigned int id =    glCreateShader(type);
@@ -82,20 +138,40 @@ int main(int agr, char** argv)
         glfwMakeContextCurrent(window);
         glewInit();
         
+        /*
         float positions[]{
             -0.5f, -0.5f, 
              0.0f, 0.5f,
              0.5f, -0.5f
         };
+        */
 
-        //  vertext buffer, memory found in the vram
+        //Position for drawing a square
+        float positions[] = {
+            -0.5f,-0.5f,
+             0.5f, -0.5f,
+             0.5f,0.5f,
+            -0.5f, 0.5f,
+        };
+        //index buffer; reusing existing data
+        unsigned int indices[] = {
+            0,1,2,
+            2,3,0
+        };
+
+        //  vertex  buffer, memory found in the vram
 
         unsigned int buffer;
         glGenBuffers(1, &buffer); //number of buffers and the ID
 
         glBindBuffer(GL_ARRAY_BUFFER, buffer); //binding  the bufffer with type  and the buffer itsself
 
-        glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), positions, GL_STATIC_DRAW); //filling the buffer with data And its usage
+
+        //filling the buffer with data And its usage
+       // glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), positions, GL_STATIC_DRAW); 
+
+        //glBufferData for square
+        glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), positions, GL_STATIC_DRAW);
 
         //interpreting the buffer attribute ie the layout of the memory
         // index of first attrib,size(HOW MANY VERTEX 2D), type, norm, stride(SIZE TO THE NEXT VERTEX), pointer to the next attribute: in our case we have just position as the only attribute 
@@ -103,30 +179,21 @@ int main(int agr, char** argv)
 
         glEnableVertexAttribArray(0); //enable the attrib in the buffer and the first index
 
-        //writing vextor shader
-        std::string vertexShader = 
-            "#version 430 core \n"
-            "\n"
-            //locating the attribute in the vectex, in this case 0 as seen in glVertexAttribPointer
-            "layout(location = 0) in vec2 position;\n" //note position have 2 dimention
-            "\n"
-            "void main()\n"
-            "{\n"
-            "gl_Position = vec4(position.xy,0.0,1.0);\n"
-            
-            "}\n";
-        //writing frament shader
-        std::string fragmentShader = 
-            "#version 430 core \n"
-         
-            "\n"
-            "void main()\n"
-            "{\n"
-            "gl_FragColor = vec4(1.0,0.0,0.0,1.0);\n"
-            
-            "}\n";
 
-        unsigned int shader = CreateShader(vertexShader,fragmentShader);
+        //index buffer object for square
+        //sending the index to the gpu and rendering them
+        unsigned int ibo;
+        glGenBuffers(1, &ibo); //number of ibo and the ID
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo); //binding  the ibo with type  and the buffer itsself
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 *  sizeof(unsigned int),indices, GL_STATIC_DRAW);
+
+
+
+        ShaderProgramSource source = ParseShader("res/shaders/Basic.shader");
+        
+
+        unsigned int shader = CreateShader(source.VertexSource,source.FragmentSource);
         glUseProgram(shader);
 
 
@@ -136,8 +203,8 @@ int main(int agr, char** argv)
             /* Render here */
             glClear(GL_COLOR_BUFFER_BIT);
 
-        
-
+            GLClearError();
+           
     /*
    
     LEGACY OPENGL CODE
@@ -167,8 +234,13 @@ int main(int agr, char** argv)
  compute shaders
 
 */
-           glDrawArrays(GL_TRIANGLES,0,3);
+        //   glDrawArrays(GL_TRIANGLES,0,3);
             
+           //glDraw for square, using 6 vertecis
+
+           
+           glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+           GLCheckError();
             /* Swap front and back buffers */
             glfwSwapBuffers(window);
 
